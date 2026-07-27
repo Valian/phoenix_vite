@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-07-27
+
+- Fix heex warning for using rel attribute with `:global` [[#27](https://github.com/LostKobrakai/phoenix_vite/pull/27)]
+- Work for projects generated with `--no-tailwind` [[#26](https://github.com/LostKobrakai/phoenix_vite/pull/26)]
+- Update for phx_new 1.8.9
+
 ## [0.4.3] - 2026-04-14
 
 - Rebuild JS on publishing to hex

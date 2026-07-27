@@ -96,7 +96,7 @@ defmodule PhoenixVite.IgniterTest do
       phx_test_project()
       |> ViteIgniter.use_only_vite_reloading_for_assets(:test, TestWeb.Endpoint)
       |> assert_has_patch("config/runtime.exs", """
-      32    - |        ~r"priv/static/(?!uploads/).*\\.(js|css|png|jpeg|jpg|gif|svg)$"E,
+      32    - |        ~r"priv/static/(?!uploads/).*\\.(js|css|png|jpeg|jpg|gif|svg)$"
       """)
     end
   end
