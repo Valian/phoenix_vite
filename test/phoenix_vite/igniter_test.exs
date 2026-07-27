@@ -86,17 +86,17 @@ defmodule PhoenixVite.IgniterTest do
       phx_test_project()
       |> ViteIgniter.use_only_vite_assets_caching(:test, TestWeb.Endpoint)
       |> assert_has_patch("config/runtime.exs", """
-      52 + |    cache_static_manifest_latest: PhoenixVite.cache_static_manifest_latest(:test)
+      69 + |    cache_static_manifest_latest: PhoenixVite.cache_static_manifest_latest(:test)
       """)
     end
   end
 
   describe "use_only_vite_reloading_for_assets/3" do
-    test "removes assets patterns config from dev.exs" do
+    test "removes assets patterns config from runtime.exs" do
       phx_test_project()
       |> ViteIgniter.use_only_vite_reloading_for_assets(:test, TestWeb.Endpoint)
-      |> assert_has_patch("config/dev.exs", """
-      60    - |      ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
+      |> assert_has_patch("config/runtime.exs", """
+      32    - |        ~r"priv/static/(?!uploads/).*\\.(js|css|png|jpeg|jpg|gif|svg)$"E,
       """)
     end
   end
@@ -165,15 +165,15 @@ defmodule PhoenixVite.IgniterTest do
         |> ViteIgniter.link_root_layout_to_vite(:test, TestWeb.Endpoint, TestWeb)
 
       assert diff(igniter) =~ """
-             10    - |    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
-             11    - |    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
-             12    - |    </script>
-                10 + |    <PhoenixVite.Components.assets
-                11 + |      names={["js/app.js", "css/app.css"]}
-                12 + |      manifest={{:test, "priv/static/.vite/manifest.json"}}
-                13 + |      dev_server={PhoenixVite.Components.has_vite_watcher?(TestWeb.Endpoint)}
-                14 + |      to_url={fn p -> static_url(@conn, p) end}
-                15 + |    />
+              8    - |    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+              9    - |    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+             10    - |    </script>
+                 8 + |    <PhoenixVite.Components.assets
+                 9 + |      names={["js/app.js", "css/app.css"]}
+                10 + |      manifest={{:test, "priv/static/.vite/manifest.json"}}
+                11 + |      dev_server={PhoenixVite.Components.has_vite_watcher?(TestWeb.Endpoint)}
+                12 + |      to_url={fn p -> static_url(@conn, p) end}
+                13 + |    />
              """
     end
   end
@@ -195,27 +195,28 @@ defmodule PhoenixVite.IgniterTest do
       phx_test_project()
       |> ViteIgniter.remove_default_assets_handling(:test, TestWeb.Endpoint)
       |> assert_has_patch("config/config.exs", """
-      34    - |# Configure esbuild (the version is required)
-      35    - |config :esbuild,
-      36    - |  version: "0.25.4",
-      37    - |  test: [
-      38    - |    args:
-      39    - |      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
-      40    - |    cd: Path.expand("../assets", __DIR__),
-      41    - |    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
-      42    - |  ]
-      43    - |
-      44    - |# Configure tailwind (the version is required)
-      45    - |config :tailwind,
-      46    - |  version: "4.1.7",
-      47    - |  test: [
-      48    - |    args: ~w(
-      49    - |      --input=assets/css/app.css
-      50    - |      --output=priv/static/assets/css/app.css
-      51    - |    ),
-      52    - |    cd: Path.expand("..", __DIR__)
-      53    - |  ]
-      54    - |
+      39    - |# Configure esbuild (the version is required)
+      40    - |config :esbuild,
+      41    - |  version: "0.25.4",
+      42    - |  test: [
+      43    - |    args:
+      44    - |      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
+      45    - |    cd: Path.expand("../assets", __DIR__),
+      46    - |    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+      47    - |  ]
+      48    - |
+      49    - |# Configure tailwind (the version is required)
+      50    - |config :tailwind,
+      51    - |  version: "4.3.0",
+      52    - |  test: [
+      53    - |    args: ~w(
+      54    - |      --input=assets/css/app.css
+      55    - |      --output=priv/static/assets/css/app.css
+      56    - |    ),
+      57    - |    cd: Path.expand("..", __DIR__),
+      58    - |    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+      59    - |  ]
+      60    - |
       """)
     end
 
@@ -224,7 +225,7 @@ defmodule PhoenixVite.IgniterTest do
       |> ViteIgniter.remove_default_assets_handling(:test, TestWeb.Endpoint)
       |> assert_has_patch("mix.exs", """
       52    - |      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
-      53    - |      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
+      53    - |      {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       """)
     end
 
@@ -263,25 +264,26 @@ defmodule PhoenixVite.IgniterTest do
       phx_test_project()
       |> ViteIgniter.adjust_js_dependency_management()
       |> assert_rms([
-        "assets/vendor/topbar.js",
-        "assets/vendor/daisyui.js",
-        "assets/vendor/daisyui-theme.js"
+        "assets/vendor/topbar.js"
       ])
       |> assert_has_patch("assets/js/app.js", """
       26    - |import topbar from "../vendor/topbar"
          26 + |import topbar from "topbar"
       """)
       |> assert_has_patch("assets/css/app.css", """
-      16     - |@plugin "../vendor/daisyui" {
-          16 + |@plugin "daisyui" {
+      17     - |@plugin "daisyui/packages/bundle/daisyui" {
+          17 + |@plugin "daisyui" {
       """)
       |> assert_has_patch("assets/css/app.css", """
-      24     - |@plugin "../vendor/daisyui-theme" {
+      24     - |@plugin "daisyui/packages/bundle/daisyui-theme" {
           24 + |@plugin "daisyui/theme" {
       """)
       |> assert_has_patch("assets/css/app.css", """
-      59     - |@plugin "../vendor/daisyui-theme" {
+      59     - |@plugin "daisyui/packages/bundle/daisyui-theme" {
           59 + |@plugin "daisyui/theme" {
+      """)
+      |> assert_has_patch("mix.exs", """
+      61 - |      {:daisyui,
       """)
     end
   end
@@ -291,7 +293,7 @@ defmodule PhoenixVite.IgniterTest do
       phx_test_project()
       |> ViteIgniter.add_bun(:test, TestWeb.Endpoint)
       |> assert_has_patch("mix.exs", """
-      69 + |      {:bun, "~> 1.5 and >= 1.5.1", runtime: Mix.env() == :dev}
+      76 + |      {:bun, "~> 2.0", runtime: Mix.env() == :dev}
       """)
     end
 
@@ -329,16 +331,16 @@ defmodule PhoenixVite.IgniterTest do
       phx_test_project()
       |> ViteIgniter.add_bun(:test, TestWeb.Endpoint)
       |> assert_has_patch("mix.exs", """
-      84    - |      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      85    - |      "assets.build": ["compile", "tailwind test", "esbuild test"],
-         85 + |      "assets.setup": ["bun.install --if-missing", "bun assets install"],
-         86 + |      "assets.build": ["bun vite build"],
-      86 87   |      "assets.deploy": [
-      87    - |        "tailwind test --minify",
-      88    - |        "esbuild test --minify",
-      89    - |        "phx.digest"
-         88 + |        "assets.build"
-      90 89   |      ]
+      91     - |      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      92     - |      "assets.build": ["compile", "tailwind test", "esbuild test"],
+          92 + |      "assets.setup": ["bun.install --if-missing", "bun assets install"],
+          93 + |      "assets.build": ["bun vite build"],
+      93  94   |      "assets.deploy": [
+      94     - |        "tailwind test --minify",
+      95     - |        "esbuild test --minify",
+      96     - |        "phx.digest"
+          95 + |        "assets.build"
+      97  96   |      ]
       """)
     end
   end
@@ -376,16 +378,16 @@ defmodule PhoenixVite.IgniterTest do
       phx_test_project()
       |> ViteIgniter.add_local_node(:test, TestWeb.Endpoint)
       |> assert_has_patch("mix.exs", """
-      84    - |      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      85    - |      "assets.build": ["compile", "tailwind test", "esbuild test"],
-         84 + |      "assets.setup": ["phoenix_vite.npm assets install"],
-         85 + |      "assets.build": ["phoenix_vite.npm vite build"],
-      86 86   |      "assets.deploy": [
-      87    - |        "tailwind test --minify",
-      88    - |        "esbuild test --minify",
-      89    - |        "phx.digest"
-         87 + |        "assets.build"
-      90 88   |      ]
+      91     - |      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      92     - |      "assets.build": ["compile", "tailwind test", "esbuild test"],
+          91 + |      "assets.setup": ["phoenix_vite.npm assets install"],
+          92 + |      "assets.build": ["phoenix_vite.npm vite build"],
+      93  93   |      "assets.deploy": [
+      94     - |        "tailwind test --minify",
+      95     - |        "esbuild test --minify",
+      96     - |        "phx.digest"
+          94 + |        "assets.build"
+      97  95   |      ]
       """)
     end
   end

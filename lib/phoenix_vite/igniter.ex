@@ -125,42 +125,38 @@ if Code.ensure_loaded?(Igniter) do
     Assets reloading is handled by the vite dev server, not phoenix_live_reload
     """
     def use_only_vite_reloading_for_assets(igniter, app_name, endpoint) do
-      Igniter.update_elixir_file(igniter, "config/dev.exs", fn zipper ->
-        with {:ok, zipper} <-
-               Igniter.Code.Function.move_to_function_call_in_current_scope(
-                 zipper,
-                 :config,
-                 3,
-                 fn function_call ->
-                   Igniter.Code.Function.argument_equals?(function_call, 0, app_name) &&
-                     Igniter.Code.Function.argument_equals?(function_call, 1, endpoint) &&
-                     Igniter.Code.Function.argument_matches_predicate?(
-                       function_call,
-                       2,
-                       fn zipper ->
-                         Igniter.Code.Keyword.keyword_has_path?(zipper, [:live_reload, :patterns])
-                       end
-                     )
-                 end
-               ) do
-          Igniter.Code.Function.update_nth_argument(zipper, 2, fn zipper ->
-            Igniter.Code.Keyword.put_in_keyword(
-              zipper,
-              [:live_reload, :patterns],
-              [],
-              fn zipper ->
-                Igniter.Code.List.remove_from_list(zipper, fn zipper ->
-                  with {:sigil_r, _, [{:<<>>, _, [regex]}, []]} <- Zipper.node(zipper),
-                       true <- String.contains?(regex, "priv/static") do
-                    true
-                  else
-                    _ -> false
-                  end
-                end)
-              end
-            )
-          end)
+      Igniter.update_elixir_file(igniter, "config/runtime.exs", fn zipper ->
+        case move_to_live_reload_patterns(zipper, app_name, endpoint) do
+          {:ok, zipper} -> remove_priv_static_patterns(zipper)
+          :error -> {:ok, zipper}
         end
+      end)
+    end
+
+    defp move_to_live_reload_patterns(zipper, app_name, endpoint) do
+      alias Igniter.Code.Function
+
+      Function.move_to_function_call(zipper, :config, 3, fn function_call ->
+        Function.argument_equals?(function_call, 0, app_name) &&
+          Function.argument_equals?(function_call, 1, endpoint) &&
+          Function.argument_matches_predicate?(function_call, 2, fn zipper ->
+            Igniter.Code.Keyword.keyword_has_path?(zipper, [:live_reload, :patterns])
+          end)
+      end)
+    end
+
+    defp remove_priv_static_patterns(zipper) do
+      Igniter.Code.Function.update_nth_argument(zipper, 2, fn zipper ->
+        Igniter.Code.Keyword.put_in_keyword(zipper, [:live_reload, :patterns], [], fn zipper ->
+          Igniter.Code.List.remove_from_list(zipper, fn zipper ->
+            with {:sigil_r, _, [{:<<>>, _, [regex]}, _modifiers]} <- Zipper.node(zipper),
+                 true <- String.contains?(regex, "priv/static") do
+              true
+            else
+              _ -> false
+            end
+          end)
+        end)
       end)
     end
 
@@ -339,12 +335,11 @@ if Code.ensure_loaded?(Igniter) do
         |> Igniter.update_file("assets/css/app.css", fn source ->
           Rewrite.Source.update(source, :content, fn content ->
             content
-            |> String.replace("../vendor/daisyui-theme", "daisyui/theme")
-            |> String.replace("../vendor/daisyui", "daisyui")
+            |> String.replace("daisyui/packages/bundle/daisyui-theme", "daisyui/theme")
+            |> String.replace("daisyui/packages/bundle/daisyui", "daisyui")
           end)
         end)
-        |> Igniter.rm("assets/vendor/daisyui.js")
-        |> Igniter.rm("assets/vendor/daisyui-theme.js")
+        |> Igniter.Project.Deps.remove_dep(:daisyui)
       else
         igniter
       end
@@ -367,7 +362,7 @@ if Code.ensure_loaded?(Igniter) do
     def add_bun(igniter, app_name, endpoint) do
       igniter
       |> Igniter.Project.Deps.add_dep(
-        {:bun, "~> 1.5 and >= 1.5.1", runtime: quote(do: Mix.env() == :dev)},
+        {:bun, "~> 2.0", runtime: quote(do: Mix.env() == :dev)},
         append?: true
       )
       |> Igniter.Project.Config.configure("config.exs", :bun, [:version], "1.2.16")
