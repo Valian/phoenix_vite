@@ -297,86 +297,64 @@ if Code.ensure_loaded?(Igniter) do
     def adjust_js_dependency_management(igniter) do
       tailwind = has_tailwind?(igniter)
 
-      package_json =
-        if tailwind do
-          """
-          {
-            "dependencies": {
-              "phoenix": "file:../deps/phoenix",
-              "phoenix_html": "file:../deps/phoenix_html",
-              "phoenix_live_view": "file:../deps/phoenix_live_view",
-              "topbar": "^3.0.0"
-            },
-            "devDependencies": {
-              "@tailwindcss/vite": "^4.1.0",
-              "daisyui": "^5.0.0",
-              "phoenix_vite": "file:../deps/phoenix_vite",
-              "tailwindcss": "^4.1.0",
-              "vite": "^6.3.0"
-            }
-          }
-          """
-        else
-          """
-          {
-            "dependencies": {
-              "phoenix": "file:../deps/phoenix",
-              "phoenix_html": "file:../deps/phoenix_html",
-              "phoenix_live_view": "file:../deps/phoenix_live_view",
-              "topbar": "^3.0.0"
-            },
-            "devDependencies": {
-              "phoenix_vite": "file:../deps/phoenix_vite",
-              "vite": "^6.3.0"
-            }
-          }
-          """
-        end
+      tailwindDevDependencies = [
+        "@tailwindcss/vite": "^4.1.0",
+        daisyui: "^5.0.0",
+        tailwindcss: "^4.1.0"
+      ]
 
-      igniter
-      |> Igniter.create_new_file("assets/package.json", package_json)
-      |> Igniter.update_file("assets/js/app.js", fn source ->
-        Rewrite.Source.update(source, :content, fn content ->
-          String.replace(content, "../vendor/topbar", "topbar")
-        end)
-      end)
-      |> then(fn igniter ->
-        if tailwind do
-          Igniter.update_file(igniter, "assets/css/app.css", fn source ->
-            Rewrite.Source.update(source, :content, fn content ->
-              content
-              |> String.replace("../vendor/daisyui-theme", "daisyui/theme")
-              |> String.replace("../vendor/daisyui", "daisyui")
-            end)
+      package_json =
+        Jason.OrderedObject.new(
+          dependencies:
+            Jason.OrderedObject.new(
+              phoenix: "file:../deps/phoenix",
+              phoenix_html: "file:../deps/phoenix_html",
+              phoenix_live_view: "file:../deps/phoenix_live_view",
+              topbar: "^3.0.0"
+            ),
+          devDependencies:
+            Jason.OrderedObject.new(
+              [
+                phoenix_vite: "file:../deps/phoenix_vite",
+                vite: "^6.3.0"
+              ]
+              |> Enum.concat(tailwindDevDependencies)
+              |> Enum.sort()
+            )
+        )
+        |> Jason.encode!(pretty: true)
+
+      igniter =
+        igniter
+        |> Igniter.create_new_file("assets/package.json", package_json <> "\n")
+        |> Igniter.update_file("assets/js/app.js", fn source ->
+          Rewrite.Source.update(source, :content, fn content ->
+            String.replace(content, "../vendor/topbar", "topbar")
           end)
-        else
-          igniter
-        end
-      end)
-      |> Igniter.rm("assets/vendor/topbar.js")
-      |> then(fn igniter ->
-        if tailwind do
-          igniter
-          |> Igniter.rm("assets/vendor/daisyui.js")
-          |> Igniter.rm("assets/vendor/daisyui-theme.js")
-        else
-          igniter
-        end
-      end)
+        end)
+        |> Igniter.rm("assets/vendor/topbar.js")
+
+      if tailwind do
+        igniter
+        |> Igniter.update_file("assets/css/app.css", fn source ->
+          Rewrite.Source.update(source, :content, fn content ->
+            content
+            |> String.replace("../vendor/daisyui-theme", "daisyui/theme")
+            |> String.replace("../vendor/daisyui", "daisyui")
+          end)
+        end)
+        |> Igniter.rm("assets/vendor/daisyui.js")
+        |> Igniter.rm("assets/vendor/daisyui-theme.js")
+      else
+        igniter
+      end
     end
 
     defp has_tailwind?(igniter) do
-      Igniter.exists?(igniter, "assets/css/app.css") and
-        case Rewrite.source(igniter.rewrite, "assets/css/app.css") do
-          {:ok, source} ->
-            tailwind_css?(Rewrite.Source.get(source, :content))
-
-          :error ->
-            case File.read("assets/css/app.css") do
-              {:ok, content} -> tailwind_css?(content)
-              _ -> false
-            end
-        end
+      if Igniter.exists?(igniter, "assets/css/app.css") do
+        {:ok, source} = Rewrite.source(igniter.rewrite, "assets/css/app.css")
+        tailwind_css?(Rewrite.Source.get(source, :content))
+      end
     end
 
     defp tailwind_css?(content) do
